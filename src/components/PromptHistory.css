@@ -1,0 +1,35 @@
+.prompt-history {
+	position: absolute;
+	top: 100%;
+	left: 0;
+	width: 100%;
+	background: white;
+	border: 1px solid #ccc;
+	border-top: none;
+	max-height: 200px;
+	overflow-y: auto;
+	z-index: 100;
+}
+
+.prompt-history h2 {
+	margin: 0;
+	padding: 8px;
+	font-size: 14px;
+	font-weight: bold;
+	border-bottom: 1px solid #ccc;
+}
+
+.prompt-history ul {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.prompt-history li {
+	padding: 8px;
+	cursor: pointer;
+}
+
+.prompt-history li:hover {
+	background: #eee;
+}

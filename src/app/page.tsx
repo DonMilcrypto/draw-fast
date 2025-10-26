@@ -1,9 +1,13 @@
 /* eslint-disable @next/next/no-img-element */
 'use client'
 
+import { InpaintTool } from '@/components/InpaintTool'
 import { LiveImageShape, LiveImageShapeUtil } from '@/components/LiveImageShapeUtil'
 import { LiveImageTool, MakeLiveButton } from '@/components/LiveImageTool'
+import { AnimateProvider } from '@/hooks/useAnimate'
+import { InpaintProvider } from '@/hooks/useInpaint'
 import { LiveImageProvider } from '@/hooks/useLiveImage'
+import { StyleTransferProvider } from '@/hooks/useStyleTransfer'
 import * as fal from '@fal-ai/serverless-client'
 import {
 	AssetRecordType,
@@ -11,6 +15,7 @@ import {
 	Editor,
 	TLUiOverrides,
 	Tldraw,
+	toolbarItem,
 	track,
 	useEditor,
 } from '@tldraw/tldraw'
@@ -35,24 +40,35 @@ const overrides: TLUiOverrides = {
 				editor.setCurrentTool('live-image')
 			},
 		}
+		tools.inpaint = {
+			id: 'inpaint',
+			icon: 'tool-pencil',
+			label: 'Inpaint',
+			kbd: 'i',
+			readonlyOk: false,
+			onSelect: () => {
+				editor.setCurrentTool('inpaint')
+			},
+		}
 		return tools
 	},
-	// toolbar(_app, toolbar, { tools }) {
-	// 	const frameIndex = toolbar.findIndex((item) => item.id === 'frame')
-	// 	if (frameIndex !== -1) toolbar.splice(frameIndex, 1)
-	// 	const highlighterIndex = toolbar.findIndex((item) => item.id === 'highlight')
-	// 	if (highlighterIndex !== -1) {
-	// 		const highlighterItem = toolbar[highlighterIndex]
-	// 		toolbar.splice(highlighterIndex, 1)
-	// 		toolbar.splice(3, 0, highlighterItem)
-	// 	}
-	// 	toolbar.splice(2, 0, toolbarItem(tools.liveImage))
-	// 	return toolbar
-	// },
+	toolbar(_app, toolbar, { tools }) {
+		const frameIndex = toolbar.findIndex((item) => item.id === 'frame')
+		// 	if (frameIndex !== -1) toolbar.splice(frameIndex, 1)
+		const highlighterIndex = toolbar.findIndex((item) => item.id === 'highlight')
+		if (highlighterIndex !== -1) {
+			const highlighterItem = toolbar[highlighterIndex]
+			toolbar.splice(highlighterIndex, 1)
+			toolbar.splice(3, 0, highlighterItem)
+		}
+		toolbar.splice(2, 0, toolbarItem(tools.liveImage))
+		toolbar.splice(3, 0, toolbarItem(tools.inpaint))
+		return toolbar
+	},
 }
 
 const shapeUtils = [LiveImageShapeUtil]
-const tools = [LiveImageTool]
+const tools = [LiveImageTool, InpaintTool]
 
 export default function Home() {
 	const onEditorMount = (editor: Editor) => {
@@ -84,10 +100,13 @@ export default function Home() {
 	}
 
 	return (
-		<LiveImageProvider appId="110602490-lcm-sd15-i2i">
-			<main className="tldraw-wrapper">
-				<div className="tldraw-wrapper__inner">
-					<Tldraw
+		<AnimateProvider appId="fal-ai/kling-video/v2.1/master/image-to-video">
+			<StyleTransferProvider appId="fal-ai/image-editing/style-transfer">
+				<InpaintProvider appId="fal-ai/fooocus/inpaint">
+					<LiveImageProvider appId="110602490-lcm-sd15-i2i">
+						<main className="tldraw-wrapper">
+						<div className="tldraw-wrapper__inner">
+						<Tldraw
 						persistenceKey="draw-fast"
 						onMount={onEditorMount}
 						shapeUtils={shapeUtils}
@@ -103,6 +122,9 @@ export default function Home() {
 				</div>
 			</main>
 		</LiveImageProvider>
+	</InpaintProvider>
+	</StyleTransferProvider>
+	</AnimateProvider>
 	)
 }
 

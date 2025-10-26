@@ -9,8 +9,11 @@ import {
 	useValue,
 } from '@tldraw/editor'
 import { preventDefault, stopEventPropagation } from '@tldraw/tldraw'
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { FrameLabelInput } from './FrameLabelInput'
+import { PromptHistory } from './PromptHistory'
+
+import { LiveImageShape } from './LiveImageShapeUtil'
 
 export function FrameHeading({
 	id,
@@ -24,6 +27,32 @@ export function FrameHeading({
 	height: number
 }) {
 	const editor = useEditor()
+	const shape = editor.getShape<LiveImageShape>(id)
+	const negativePrompt = shape?.props.negative_prompt ?? ''
+	const [showHistory, setShowHistory] = useState(false)
+	const [prompts, setPrompts] = useState<string[]>([])
+
+	useEffect(() => {
+		const storedPrompts = localStorage.getItem('promptHistory')
+		if (storedPrompts) {
+			setPrompts(JSON.parse(storedPrompts))
+		}
+	}, [])
+
+	const handleSelectPrompt = useCallback(
+		(prompt: string) => {
+			editor.updateShapes([
+				{
+					id,
+					type: 'frame',
+					props: { name: prompt },
+				},
+			])
+			setShowHistory(false)
+		},
+		[editor, id]
+	)
+
 	const pageRotation = useValue(
 		'shape rotation',
 		() => canonicalizeRotation(editor.getShapePageTransform(id)!.rotation()),
@@ -112,6 +141,15 @@ export function FrameHeading({
 		>
 			<div className="tl-frame-heading-hit-area">
 				<FrameLabelInput ref={rInput} id={id} name={name} isEditing={isEditing} />
+				<button onClick={() => setShowHistory(!showHistory)}>H</button>
+				{showHistory && <PromptHistory prompts={prompts} onSelectPrompt={handleSelectPrompt} />}
+				<FrameLabelInput
+					ref={rInput}
+					id={id}
+					name={negativePrompt}
+					isEditing={isEditing}
+					placeholder="Negative prompt"
+				/>
 			</div>
 		</div>
 	)

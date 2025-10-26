@@ -13,20 +13,20 @@ import {
 import { createContext, useContext, useEffect, useState } from 'react'
 import { v4 as uuid } from 'uuid'
 
-type LiveImageResult = { url: string }
-type LiveImageRequest = {
-	prompt: string
-	negative_prompt?: string
+type StyleTransferResult = { url: string }
+type StyleTransferRequest = {
+	style_prompt: string
+	style_image_url: string
 	image_url: string
 	sync_mode: boolean
 	strength: number
 	seed: number
 	enable_safety_checks: boolean
 }
-type LiveImageContextType = null | ((req: LiveImageRequest) => Promise<LiveImageResult>)
-const LiveImageContext = createContext<LiveImageContextType>(null)
+type StyleTransferContextType = null | ((req: StyleTransferRequest) => Promise<StyleTransferResult>)
+const StyleTransferContext = createContext<StyleTransferContextType>(null)
 
-export function LiveImageProvider({
+export function StyleTransferProvider({
 	children,
 	appId,
 	throttleTime = 0,
@@ -38,13 +38,15 @@ export function LiveImageProvider({
 	timeoutTime?: number
 }) {
 	const [count, setCount] = useState(0)
-	const [fetchImage, setFetchImage] = useState<{ current: LiveImageContextType }>({ current: null })
+	const [fetchImage, setFetchImage] = useState<{ current: StyleTransferContextType }>({
+		current: null,
+	})
 
 	useEffect(() => {
 		const requestsById = new Map<
 			string,
 			{
-				resolve: (result: LiveImageResult) => void
+				resolve: (result: StyleTransferResult) => void
 				reject: (err: unknown) => void
 				timer: ReturnType<typeof setTimeout>
 			}
@@ -109,22 +111,26 @@ export function LiveImageProvider({
 	}, [appId, count, throttleTime, timeoutTime])
 
 	return (
-		<LiveImageContext.Provider value={fetchImage.current}>{children}</LiveImageContext.Provider>
+		<StyleTransferContext.Provider value={fetchImage.current}>
+			{children}
+		</StyleTransferContext.Provider>
 	)
 }
 
-export function useLiveImage(
+export function useStyleTransfer(
 	shapeId: TLShapeId,
+	style_prompt: string,
+	style_image_url: string,
 	{ throttleTime = 64 }: { throttleTime?: number } = {}
 ) {
 	const editor = useEditor()
-	const fetchImage = useContext(LiveImageContext)
-	if (!fetchImage) throw new Error('Missing LiveImageProvider')
+	const fetchImage = useContext(StyleTransferContext)
+	if (!fetchImage) throw new Error('Missing StyleTransferProvider')
 
 	useEffect(() => {
 		let prevHash = ''
 		let prevPrompt = ''
-		let prevNegativePrompt = ''
+		let prevStyleImageUrl = ''
 
 		let startedIteration = 0
 		let finishedIteration = 0
@@ -134,17 +140,15 @@ export function useLiveImage(
 			const frame = editor.getShape<LiveImageShape>(shapeId)!
 
 			const hash = getHashForObject([...shapes])
-			const frameName = frame.props.name
-			const negativePrompt = frame.props.negative_prompt
-			if (hash === prevHash && frameName === prevPrompt && negativePrompt === prevNegativePrompt)
+			if (hash === prevHash && style_prompt === prevPrompt && style_image_url === prevStyleImageUrl)
 				return
 
 			startedIteration += 1
 			const iteration = startedIteration
 
 			prevHash = hash
-			prevPrompt = frame.props.name
-			prevNegativePrompt = frame.props.negative_prompt
+			prevPrompt = style_prompt
+			prevStyleImageUrl = style_image_url
 
 			try {
 				const svgStringResult = await editor.getSvgString([...shapes], {
@@ -186,20 +190,9 @@ export function useLiveImage(
 				// cancel if stale:
 				if (iteration <= finishedIteration) return
 
-				const prompt = frameName
-					? frameName + ' hd award-winning impressive'
-					: 'A random image that is safe for work and not surprising—something boring like a city or shoe watercolor'
-
-				const storedPrompts = localStorage.getItem('promptHistory')
-				const prompts = storedPrompts ? JSON.parse(storedPrompts) : []
-				if (!prompts.includes(prompt)) {
-					prompts.unshift(prompt)
-					localStorage.setItem('promptHistory', JSON.stringify(prompts.slice(0, 10)))
-				}
-
 				const result = await fetchImage!({
-					prompt,
-					negative_prompt: negativePrompt,
+					style_prompt,
+					style_image_url,
 					image_url: imageUrl,
 					sync_mode: true,
 					strength: 0.65,
@@ -234,7 +227,7 @@ export function useLiveImage(
 			}, throttleTime)
 		}
 
-		editor.on('update-drawings' as any, requestUpdate)
+		editor.on('update-drawings'as any, requestUpdate)
 		return () => {
 			editor.off('update-drawings' as any, requestUpdate)
 		}
@@ -294,11 +287,4 @@ function getShapesTouching(shapeId: TLShapeId, editor: Editor) {
 		}
 	}
 	return shapesTouching
-}
-
-function downloadDataURLAsFile(dataUrl: string, filename: string) {
-	const link = document.createElement('a')
-	link.href = dataUrl
-	link.download = filename
-	link.click()
 }

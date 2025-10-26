@@ -3,8 +3,8 @@ import { forwardRef, useCallback } from 'react'
 
 export const FrameLabelInput = forwardRef<
 	HTMLInputElement,
-	{ id: TLShapeId; name: string; isEditing: boolean }
->(function FrameLabelInput({ id, name, isEditing }, ref) {
+	{ id: TLShapeId; name: string; isEditing: boolean; placeholder?: string }
+>(function FrameLabelInput({ id, name, isEditing, placeholder }, ref) {
 	const editor = useEditor()
 
 	const handleKeyDown = useCallback(
@@ -25,19 +25,19 @@ export const FrameLabelInput = forwardRef<
 			const shape = editor.getShape<TLFrameShape>(id)
 			if (!shape) return
 
-			const name = shape.props.name
 			const value = e.currentTarget.value.trim()
-			if (name === value) return
+			const prop = placeholder ? 'negative_prompt' : 'name'
+			if (shape.props[prop] === value) return
 
 			editor.updateShapes([
 				{
 					id,
 					type: 'frame',
-					props: { name: value },
+					props: { [prop]: value },
 				},
 			])
 		},
-		[id, editor]
+		[id, editor, placeholder]
 	)
 
 	const handleChange = useCallback(
@@ -45,19 +45,19 @@ export const FrameLabelInput = forwardRef<
 			const shape = editor.getShape<TLFrameShape>(id)
 			if (!shape) return
 
-			const name = shape.props.name
 			const value = e.currentTarget.value
-			if (name === value) return
+			const prop = placeholder ? 'negative_prompt' : 'name'
+			if (shape.props[prop] === value) return
 
 			editor.updateShapes([
 				{
 					id,
 					type: 'frame',
-					props: { name: value },
+					props: { [prop]: value },
 				},
 			])
 		},
-		[id, editor]
+		[id, editor, placeholder]
 	)
 
 	return (
@@ -67,13 +67,15 @@ export const FrameLabelInput = forwardRef<
 				ref={ref}
 				style={{ display: isEditing ? undefined : 'none' }}
 				value={name}
+				placeholder={placeholder}
 				autoFocus
 				onKeyDown={handleKeyDown}
 				onBlur={handleBlur}
 				onChange={handleChange}
 				onPointerDown={stopEventPropagation}
 			/>
-			{defaultEmptyAs(name, 'Double click prompt to edit') + String.fromCharCode(8203)}
+			{defaultEmptyAs(name, placeholder ?? 'Double click prompt to edit') +
+				String.fromCharCode(8203)}
 		</div>
 	)
 })
