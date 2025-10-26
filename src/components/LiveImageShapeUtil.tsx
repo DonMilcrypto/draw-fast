@@ -20,8 +20,12 @@ import {
 	useIsDarkMode,
 } from '@tldraw/tldraw'
 
+import { useAnimate } from '@/hooks/useAnimate'
+import { useInpaint } from '@/hooks/useInpaint'
 import { useLiveImage } from '@/hooks/useLiveImage'
+import { useStyleTransfer } from '@/hooks/useStyleTransfer'
 import { FrameHeading } from './FrameHeading'
+import { StyleTransfer } from './StyleTransfer'
 
 // See https://www.fal.ai/models/latent-consistency-sd
 
@@ -52,7 +56,12 @@ export type LiveImageShape = TLBaseShape<
 		w: number
 		h: number
 		name: string
+		negative_prompt: string
 		overlayResult?: boolean
+		style_prompt?: string
+		style_image_url?: string
+		style_transfer?: boolean
+		animate?: boolean
 	}
 >
 
@@ -68,6 +77,11 @@ export class LiveImageShapeUtil extends ShapeUtil<LiveImageShape> {
 			w: 512,
 			h: 512,
 			name: '',
+			negative_prompt: '',
+			style_prompt: '',
+			style_image_url: '',
+			style_transfer: false,
+			animate: false,
 		}
 	}
 
@@ -152,7 +166,18 @@ export class LiveImageShapeUtil extends ShapeUtil<LiveImageShape> {
 	override component(shape: LiveImageShape) {
 		const editor = useEditor()
 
-		useLiveImage(shape.id)
+		const tool = editor.getCurrentTool()
+		if (shape.props.animate) {
+			useAnimate(shape.id)
+		} else if (shape.props.style_transfer) {
+			useStyleTransfer(shape.id, shape.props.style_prompt!, shape.props.style_image_url!)
+		} else if (tool?.id === 'inpaint') {
+			// bit of a hack to get the mask image url
+			const mask_image_url = (tool as any).mask_image_url
+			useInpaint(shape.id, mask_image_url)
+		} else {
+			useLiveImage(shape.id)
+		}
 
 		const bounds = this.editor.getShapeGeometry(shape).bounds
 		const assetId = AssetRecordType.createId(shape.id.split(':')[1])
@@ -213,6 +238,63 @@ export class LiveImageShapeUtil extends ShapeUtil<LiveImageShape> {
 					}}
 				>
 					<TldrawUiButtonIcon icon={shape.props.overlayResult ? 'chevron-right' : 'chevron-left'} />
+				</TldrawUiButton>
+				<TldrawUiButton
+					type="icon"
+					style={{
+						position: 'absolute',
+						top: 30,
+						left: shape.props.w,
+						pointerEvents: 'auto',
+						transform: 'scale(var(--tl-scale))',
+						transformOrigin: '0 4px',
+					}}
+					onPointerDown={(e) => {
+						e.stopPropagation()
+					}}
+					onClick={(e) => {
+						editor.updateShape<LiveImageShape>({
+							id: shape.id,
+							type: 'live-image',
+							props: { style_transfer: !shape.props.style_transfer },
+						})
+					}}
+				>
+					<TldrawUiButtonIcon icon="style" />
+				</TldrawUiButton>
+				{shape.props.style_transfer && (
+					<StyleTransfer
+						onStyleChange={(style_prompt, style_image_url) => {
+							editor.updateShape<LiveImageShape>({
+								id: shape.id,
+								type: 'live-image',
+								props: { style_prompt, style_image_url },
+							})
+						}}
+					/>
+				)}
+				<TldrawUiButton
+					type="icon"
+					style={{
+						position: 'absolute',
+						top: 60,
+						left: shape.props.w,
+						pointerEvents: 'auto',
+						transform: 'scale(var(--tl-scale))',
+						transformOrigin: '0 4px',
+					}}
+					onPointerDown={(e) => {
+						e.stopPropagation()
+					}}
+					onClick={(e) => {
+						editor.updateShape<LiveImageShape>({
+							id: shape.id,
+							type: 'live-image',
+							props: { animate: !shape.props.animate },
+						})
+					}}
+				>
+					<TldrawUiButtonIcon icon="video" />
 				</TldrawUiButton>
 			</>
 		)

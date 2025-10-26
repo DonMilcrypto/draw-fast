@@ -13,20 +13,21 @@ import {
 import { createContext, useContext, useEffect, useState } from 'react'
 import { v4 as uuid } from 'uuid'
 
-type LiveImageResult = { url: string }
-type LiveImageRequest = {
+type InpaintResult = { url: string }
+type InpaintRequest = {
 	prompt: string
 	negative_prompt?: string
-	image_url: string
+	inpaint_image_url: string
+	mask_image_url: string
 	sync_mode: boolean
 	strength: number
 	seed: number
 	enable_safety_checks: boolean
 }
-type LiveImageContextType = null | ((req: LiveImageRequest) => Promise<LiveImageResult>)
-const LiveImageContext = createContext<LiveImageContextType>(null)
+type InpaintContextType = null | ((req: InpaintRequest) => Promise<InpaintResult>)
+const InpaintContext = createContext<InpaintContextType>(null)
 
-export function LiveImageProvider({
+export function InpaintProvider({
 	children,
 	appId,
 	throttleTime = 0,
@@ -38,13 +39,13 @@ export function LiveImageProvider({
 	timeoutTime?: number
 }) {
 	const [count, setCount] = useState(0)
-	const [fetchImage, setFetchImage] = useState<{ current: LiveImageContextType }>({ current: null })
+	const [fetchImage, setFetchImage] = useState<{ current: InpaintContextType }>({ current: null })
 
 	useEffect(() => {
 		const requestsById = new Map<
 			string,
 			{
-				resolve: (result: LiveImageResult) => void
+				resolve: (result: InpaintResult) => void
 				reject: (err: unknown) => void
 				timer: ReturnType<typeof setTimeout>
 			}
@@ -108,18 +109,17 @@ export function LiveImageProvider({
 		}
 	}, [appId, count, throttleTime, timeoutTime])
 
-	return (
-		<LiveImageContext.Provider value={fetchImage.current}>{children}</LiveImageContext.Provider>
-	)
+	return <InpaintContext.Provider value={fetchImage.current}>{children}</InpaintContext.Provider>
 }
 
-export function useLiveImage(
+export function useInpaint(
 	shapeId: TLShapeId,
+	mask_image_url: string | null,
 	{ throttleTime = 64 }: { throttleTime?: number } = {}
 ) {
 	const editor = useEditor()
-	const fetchImage = useContext(LiveImageContext)
-	if (!fetchImage) throw new Error('Missing LiveImageProvider')
+	const fetchImage = useContext(InpaintContext)
+	if (!fetchImage) throw new Error('Missing InpaintProvider')
 
 	useEffect(() => {
 		let prevHash = ''
@@ -190,17 +190,13 @@ export function useLiveImage(
 					? frameName + ' hd award-winning impressive'
 					: 'A random image that is safe for work and not surprising—something boring like a city or shoe watercolor'
 
-				const storedPrompts = localStorage.getItem('promptHistory')
-				const prompts = storedPrompts ? JSON.parse(storedPrompts) : []
-				if (!prompts.includes(prompt)) {
-					prompts.unshift(prompt)
-					localStorage.setItem('promptHistory', JSON.stringify(prompts.slice(0, 10)))
-				}
+				if (!mask_image_url) return
 
 				const result = await fetchImage!({
 					prompt,
 					negative_prompt: negativePrompt,
-					image_url: imageUrl,
+					inpaint_image_url: imageUrl,
+					mask_image_url,
 					sync_mode: true,
 					strength: 0.65,
 					seed: 42,
@@ -294,11 +290,4 @@ function getShapesTouching(shapeId: TLShapeId, editor: Editor) {
 		}
 	}
 	return shapesTouching
-}
-
-function downloadDataURLAsFile(dataUrl: string, filename: string) {
-	const link = document.createElement('a')
-	link.href = dataUrl
-	link.download = filename
-	link.click()
 }

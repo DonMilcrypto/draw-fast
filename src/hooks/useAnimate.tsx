@@ -13,20 +13,18 @@ import {
 import { createContext, useContext, useEffect, useState } from 'react'
 import { v4 as uuid } from 'uuid'
 
-type LiveImageResult = { url: string }
-type LiveImageRequest = {
+type AnimateResult = { url: string }
+type AnimateRequest = {
 	prompt: string
-	negative_prompt?: string
 	image_url: string
 	sync_mode: boolean
-	strength: number
-	seed: number
+	duration: number
 	enable_safety_checks: boolean
 }
-type LiveImageContextType = null | ((req: LiveImageRequest) => Promise<LiveImageResult>)
-const LiveImageContext = createContext<LiveImageContextType>(null)
+type AnimateContextType = null | ((req: AnimateRequest) => Promise<AnimateResult>)
+const AnimateContext = createContext<AnimateContextType>(null)
 
-export function LiveImageProvider({
+export function AnimateProvider({
 	children,
 	appId,
 	throttleTime = 0,
@@ -38,13 +36,13 @@ export function LiveImageProvider({
 	timeoutTime?: number
 }) {
 	const [count, setCount] = useState(0)
-	const [fetchImage, setFetchImage] = useState<{ current: LiveImageContextType }>({ current: null })
+	const [fetchImage, setFetchImage] = useState<{ current: AnimateContextType }>({ current: null })
 
 	useEffect(() => {
 		const requestsById = new Map<
 			string,
 			{
-				resolve: (result: LiveImageResult) => void
+				resolve: (result: AnimateResult) => void
 				reject: (err: unknown) => void
 				timer: ReturnType<typeof setTimeout>
 			}
@@ -62,11 +60,11 @@ export function LiveImageProvider({
 				}, 500)
 			},
 			onResult: (result) => {
-				if (result.images && result.images[0]) {
+				if (result.video) {
 					const id = result.request_id
 					const request = requestsById.get(id)
 					if (request) {
-						request.resolve(result.images[0])
+						request.resolve(result.video)
 					}
 				}
 			},
@@ -108,23 +106,20 @@ export function LiveImageProvider({
 		}
 	}, [appId, count, throttleTime, timeoutTime])
 
-	return (
-		<LiveImageContext.Provider value={fetchImage.current}>{children}</LiveImageContext.Provider>
-	)
+	return <AnimateContext.Provider value={fetchImage.current}>{children}</AnimateContext.Provider>
 }
 
-export function useLiveImage(
+export function useAnimate(
 	shapeId: TLShapeId,
 	{ throttleTime = 64 }: { throttleTime?: number } = {}
 ) {
 	const editor = useEditor()
-	const fetchImage = useContext(LiveImageContext)
-	if (!fetchImage) throw new Error('Missing LiveImageProvider')
+	const fetchImage = useContext(AnimateContext)
+	if (!fetchImage) throw new Error('Missing AnimateProvider')
 
 	useEffect(() => {
 		let prevHash = ''
 		let prevPrompt = ''
-		let prevNegativePrompt = ''
 
 		let startedIteration = 0
 		let finishedIteration = 0
@@ -135,16 +130,13 @@ export function useLiveImage(
 
 			const hash = getHashForObject([...shapes])
 			const frameName = frame.props.name
-			const negativePrompt = frame.props.negative_prompt
-			if (hash === prevHash && frameName === prevPrompt && negativePrompt === prevNegativePrompt)
-				return
+			if (hash === prevHash && frameName === prevPrompt) return
 
 			startedIteration += 1
 			const iteration = startedIteration
 
 			prevHash = hash
 			prevPrompt = frame.props.name
-			prevNegativePrompt = frame.props.negative_prompt
 
 			try {
 				const svgStringResult = await editor.getSvgString([...shapes], {
@@ -190,20 +182,11 @@ export function useLiveImage(
 					? frameName + ' hd award-winning impressive'
 					: 'A random image that is safe for work and not surprising—something boring like a city or shoe watercolor'
 
-				const storedPrompts = localStorage.getItem('promptHistory')
-				const prompts = storedPrompts ? JSON.parse(storedPrompts) : []
-				if (!prompts.includes(prompt)) {
-					prompts.unshift(prompt)
-					localStorage.setItem('promptHistory', JSON.stringify(prompts.slice(0, 10)))
-				}
-
 				const result = await fetchImage!({
 					prompt,
-					negative_prompt: negativePrompt,
 					image_url: imageUrl,
 					sync_mode: true,
-					strength: 0.65,
-					seed: 42,
+					duration: 5,
 					enable_safety_checks: false,
 				})
 
@@ -254,14 +237,14 @@ function updateImage(editor: Editor, shapeId: TLShapeId, url: string | null) {
 		editor.createAssets([
 			AssetRecordType.create({
 				id,
-				type: 'image',
+				type: 'video',
 				props: {
 					name: shape.props.name,
 					w: shape.props.w,
 					h: shape.props.h,
 					src: url,
-					isAnimated: false,
-					mimeType: 'image/jpeg',
+					isAnimated: true,
+					mimeType: 'video/mp4',
 				},
 			}),
 		])
@@ -269,7 +252,7 @@ function updateImage(editor: Editor, shapeId: TLShapeId, url: string | null) {
 		editor.updateAssets([
 			{
 				...asset,
-				type: 'image',
+				type: 'video',
 				props: {
 					...asset.props,
 					w: shape.props.w,
@@ -294,11 +277,4 @@ function getShapesTouching(shapeId: TLShapeId, editor: Editor) {
 		}
 	}
 	return shapesTouching
-}
-
-function downloadDataURLAsFile(dataUrl: string, filename: string) {
-	const link = document.createElement('a')
-	link.href = dataUrl
-	link.download = filename
-	link.click()
 }
