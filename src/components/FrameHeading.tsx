@@ -102,6 +102,7 @@ export function FrameHeading({
 			className="tl-frame-heading"
 			style={{
 				overflow: isEditing ? 'visible' : 'hidden',
+				backgroundColor: 'lightblue',
 				maxWidth: `calc(var(--tl-zoom) * ${
 					labelSide === 'top' || labelSide === 'bottom' ? Math.ceil(width) : Math.ceil(height)
 				}px + var(--space-5))`,
