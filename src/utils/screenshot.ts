@@ -1,7 +1,3 @@
-import { type } from 'os'
-
-const fileReader = new FileReader()
-
 let _canvas: HTMLCanvasElement | null = null
 let _ctx: CanvasRenderingContext2D | null = null
 
@@ -19,9 +15,10 @@ async function fastGetSvgAsString(svg: SVGElement) {
 			if (!src.startsWith('data:')) {
 				const blob = await (await fetch(src)).blob()
 				const base64 = await new Promise<string>((resolve, reject) => {
-					fileReader.onload = () => resolve(fileReader.result as string)
-					fileReader.onerror = () => reject(fileReader.error)
-					fileReader.readAsDataURL(blob)
+					const reader = new FileReader()
+					reader.onload = () => resolve(reader.result as string)
+					reader.onerror = () => reject(reader.error)
+					reader.readAsDataURL(blob)
 				})
 				img.setAttribute('xlink:href', base64)
 			}
@@ -92,7 +89,7 @@ export async function fastGetSvgAsImage(
 				}
 				resolve(blob)
 			},
-			'image/' + type,
+			'image/' + options.type,
 			options.quality
 		)
 	)

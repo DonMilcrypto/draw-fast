@@ -1,4 +1,4 @@
-@import url('@tldraw/tldraw/tldraw.css');
+@import url('tldraw/tldraw.css');
 
 html,
 * {
@@ -14,7 +14,6 @@ body {
 	min-height: -webkit-fill-available;
 	height: 100%;
 }
-
 
 .lockup__link img.lockup__by {
 	height: 40px;
@@ -166,5 +165,5 @@ body {
 }
 
 a {
-	color: black
+	color: black;
 }

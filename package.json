@@ -11,12 +11,12 @@
 		"format": "prettier --write ."
 	},
 	"dependencies": {
-		"@fal-ai/serverless-client": "^0.6.0",
+		"@fal-ai/serverless-client": "^0.6.1",
 		"@fal-ai/serverless-proxy": "^0.6.0",
-		"@tldraw/tldraw": "3.1.0",
-		"next": "14.0.3",
+		"next": "^14.0.3",
 		"react": "^18",
 		"react-dom": "^18",
+		"tldraw": "next",
 		"uuid": "^9.0.1"
 	},
 	"devDependencies": {

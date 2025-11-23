@@ -8,8 +8,8 @@ import {
 	useIsEditing,
 	useValue,
 } from '@tldraw/editor'
-import { preventDefault, stopEventPropagation } from '@tldraw/tldraw'
 import { useCallback, useEffect, useRef } from 'react'
+import { preventDefault, stopEventPropagation } from 'tldraw'
 import { FrameLabelInput } from './FrameLabelInput'
 
 export function FrameHeading({

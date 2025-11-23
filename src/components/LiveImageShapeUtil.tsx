@@ -18,7 +18,7 @@ import {
 	toDomPrecision,
 	useEditor,
 	useIsDarkMode,
-} from '@tldraw/tldraw'
+} from 'tldraw'
 
 import { useLiveImage } from '@/hooks/useLiveImage'
 import { FrameHeading } from './FrameHeading'

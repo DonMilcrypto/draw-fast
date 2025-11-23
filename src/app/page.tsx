@@ -5,6 +5,8 @@ import { LiveImageShape, LiveImageShapeUtil } from '@/components/LiveImageShapeU
 import { LiveImageTool, MakeLiveButton } from '@/components/LiveImageTool'
 import { LiveImageProvider } from '@/hooks/useLiveImage'
 import * as fal from '@fal-ai/serverless-client'
+import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
 	AssetRecordType,
 	DefaultSizeStyle,
@@ -13,9 +15,7 @@ import {
 	Tldraw,
 	track,
 	useEditor,
-} from '@tldraw/tldraw'
-import { useEffect, useMemo, useState } from 'react'
-import { createPortal } from 'react-dom'
+} from 'tldraw'
 
 fal.config({
 	requestMiddleware: fal.withProxy({

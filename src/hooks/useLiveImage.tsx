@@ -1,6 +1,7 @@
 import { LiveImageShape } from '@/components/LiveImageShapeUtil'
 import { fastGetSvgAsImage } from '@/utils/screenshot'
 import * as fal from '@fal-ai/serverless-client'
+import { createContext, useContext, useEffect, useState } from 'react'
 import {
 	AssetRecordType,
 	Editor,
@@ -9,8 +10,7 @@ import {
 	TLShapeId,
 	getHashForObject,
 	useEditor,
-} from '@tldraw/tldraw'
-import { createContext, useContext, useEffect, useState } from 'react'
+} from 'tldraw'
 import { v4 as uuid } from 'uuid'
 
 type LiveImageResult = { url: string }
