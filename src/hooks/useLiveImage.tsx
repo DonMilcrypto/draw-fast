@@ -1,7 +1,7 @@
+import { LiveImageContext } from '@/components/LiveImageProvider'
 import { LiveImageShape } from '@/components/LiveImageShapeUtil'
 import { fastGetSvgAsImage } from '@/utils/screenshot'
-import * as fal from '@fal-ai/serverless-client'
-import { createContext, useContext, useEffect, useState } from 'react'
+import { useContext, useEffect, useRef, useState } from 'react'
 import {
 	AssetRecordType,
 	Editor,
@@ -11,106 +11,6 @@ import {
 	getHashForObject,
 	useEditor,
 } from 'tldraw'
-import { v4 as uuid } from 'uuid'
-
-type LiveImageResult = { url: string }
-type LiveImageRequest = {
-	prompt: string
-	image_url: string
-	sync_mode: boolean
-	strength: number
-	seed: number
-	enable_safety_checks: boolean
-}
-type LiveImageContextType = null | ((req: LiveImageRequest) => Promise<LiveImageResult>)
-const LiveImageContext = createContext<LiveImageContextType>(null)
-
-export function LiveImageProvider({
-	children,
-	appId,
-	throttleTime = 0,
-	timeoutTime = 5000,
-}: {
-	children: React.ReactNode
-	appId: string
-	throttleTime?: number
-	timeoutTime?: number
-}) {
-	const [count, setCount] = useState(0)
-	const [fetchImage, setFetchImage] = useState<{ current: LiveImageContextType }>({ current: null })
-
-	useEffect(() => {
-		const requestsById = new Map<
-			string,
-			{
-				resolve: (result: LiveImageResult) => void
-				reject: (err: unknown) => void
-				timer: ReturnType<typeof setTimeout>
-			}
-		>()
-
-		const { send, close } = fal.realtime.connect(appId, {
-			connectionKey: 'fal-realtime-example',
-			clientOnly: false,
-			throttleInterval: throttleTime,
-			onError: (error) => {
-				console.error(error)
-				// force re-connect
-				setTimeout(() => {
-					setCount((count) => count + 1)
-				}, 500)
-			},
-			onResult: (result) => {
-				if (result.images && result.images[0]) {
-					const id = result.request_id
-					const request = requestsById.get(id)
-					if (request) {
-						request.resolve(result.images[0])
-					}
-				}
-			},
-		})
-
-		setFetchImage({
-			current: (req) => {
-				return new Promise((resolve, reject) => {
-					const id = uuid()
-					const timer = setTimeout(() => {
-						requestsById.delete(id)
-						reject(new Error('Timeout'))
-					}, timeoutTime)
-					requestsById.set(id, {
-						resolve: (res) => {
-							resolve(res)
-							clearTimeout(timer)
-						},
-						reject: (err) => {
-							reject(err)
-							clearTimeout(timer)
-						},
-						timer,
-					})
-					send({ ...req, request_id: id })
-				})
-			},
-		})
-
-		return () => {
-			for (const request of requestsById.values()) {
-				request.reject(new Error('Connection closed'))
-			}
-			try {
-				close()
-			} catch (e) {
-				// noop
-			}
-		}
-	}, [appId, count, throttleTime, timeoutTime])
-
-	return (
-		<LiveImageContext.Provider value={fetchImage.current}>{children}</LiveImageContext.Provider>
-	)
-}
 
 export function useLiveImage(
 	shapeId: TLShapeId,
@@ -118,6 +18,18 @@ export function useLiveImage(
 ) {
 	const editor = useEditor()
 	const fetchImage = useContext(LiveImageContext)
+	const [isLoading, setIsLoading] = useState(false)
+	const [error, setError] = useState<Error | null>(null)
+
+	// Use a ref to track if we are currently generating to avoid state updates on unmounted components
+	const isMounted = useRef(true)
+
+	useEffect(() => {
+		return () => {
+			isMounted.current = false
+		}
+	}, [])
+
 	if (!fetchImage) throw new Error('Missing LiveImageProvider')
 
 	useEffect(() => {
@@ -133,6 +45,8 @@ export function useLiveImage(
 
 			const hash = getHashForObject([...shapes])
 			const frameName = frame.props.name
+
+			// Check if anything changed
 			if (hash === prevHash && frameName === prevPrompt) return
 
 			startedIteration += 1
@@ -140,6 +54,9 @@ export function useLiveImage(
 
 			prevHash = hash
 			prevPrompt = frame.props.name
+
+			if (isMounted.current) setIsLoading(true)
+			if (isMounted.current) setError(null)
 
 			try {
 				const svgStringResult = await editor.getSvgString([...shapes], {
@@ -153,6 +70,7 @@ export function useLiveImage(
 				if (!svgStringResult) {
 					console.warn('No SVG')
 					updateImage(editor, frame.id, null)
+					if (isMounted.current) setIsLoading(false)
 					return
 				}
 
@@ -173,6 +91,7 @@ export function useLiveImage(
 				if (!blob) {
 					console.warn('No Blob')
 					updateImage(editor, frame.id, null)
+					if (isMounted.current) setIsLoading(false)
 					return
 				}
 
@@ -181,16 +100,18 @@ export function useLiveImage(
 				// cancel if stale:
 				if (iteration <= finishedIteration) return
 
+				// Use props from the shape or defaults
+				// We need to update LiveImageShape to include these props later
 				const prompt = frameName
-					? frameName + ' hd award-winning impressive'
+					? frameName + (frame.props.promptSuffix ?? ' hd award-winning impressive')
 					: 'A random image that is safe for work and not surprising—something boring like a city or shoe watercolor'
 
 				const result = await fetchImage!({
 					prompt,
 					image_url: imageUrl,
 					sync_mode: true,
-					strength: 0.65,
-					seed: 42,
+					strength: frame.props.strength ?? 0.65,
+					seed: frame.props.seed ?? 42,
 					enable_safety_checks: false,
 				})
 
@@ -199,16 +120,19 @@ export function useLiveImage(
 
 				finishedIteration = iteration
 				updateImage(editor, frame.id, result.url)
+				if (isMounted.current) setIsLoading(false)
 			} catch (e) {
 				const isTimeout = e instanceof Error && e.message === 'Timeout'
 				if (!isTimeout) {
 					console.error(e)
+					if (isMounted.current) setError(e instanceof Error ? e : new Error('Unknown error'))
 				}
 
 				// retry if this was the most recent request:
 				if (iteration === startedIteration) {
 					requestUpdate()
 				}
+				if (isMounted.current) setIsLoading(false)
 			}
 		}
 
@@ -226,6 +150,8 @@ export function useLiveImage(
 			editor.off('update-drawings' as any, requestUpdate)
 		}
 	}, [editor, fetchImage, shapeId, throttleTime])
+
+	return { isLoading, error }
 }
 
 function updateImage(editor: Editor, shapeId: TLShapeId, url: string | null) {
@@ -281,11 +207,4 @@ function getShapesTouching(shapeId: TLShapeId, editor: Editor) {
 		}
 	}
 	return shapesTouching
-}
-
-function downloadDataURLAsFile(dataUrl: string, filename: string) {
-	const link = document.createElement('a')
-	link.href = dataUrl
-	link.download = filename
-	link.click()
 }
