@@ -1,90 +1,26 @@
 /* eslint-disable @next/next/no-img-element */
 'use client'
 
+import { LiveImageProvider } from '@/components/LiveImageProvider'
 import { LiveImageShape, LiveImageShapeUtil } from '@/components/LiveImageShapeUtil'
-import { LiveImageTool, MakeLiveButton } from '@/components/LiveImageTool'
-import { LiveImageProvider } from '@/hooks/useLiveImage'
-import * as fal from '@fal-ai/serverless-client'
+import { MakeLiveButton } from '@/components/LiveImageTool'
+import { FAL_APP_ID } from '@/lib/constants'
+import { onEditorMount, overrides, shapeUtils, tools } from '@/lib/editor-config'
+import { initFalClient } from '@/lib/fal-client'
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
 	AssetRecordType,
-	DefaultSizeStyle,
-	Editor,
-	TLUiOverrides,
 	Tldraw,
 	track,
 	useEditor,
 } from 'tldraw'
 
-fal.config({
-	requestMiddleware: fal.withProxy({
-		targetUrl: '/api/fal/proxy',
-	}),
-})
-
-const overrides: TLUiOverrides = {
-	tools(editor, tools) {
-		tools.liveImage = {
-			id: 'live-image',
-			icon: 'tool-frame',
-			label: 'Frame',
-			kbd: 'f',
-			readonlyOk: false,
-			onSelect: () => {
-				editor.setCurrentTool('live-image')
-			},
-		}
-		return tools
-	},
-	// toolbar(_app, toolbar, { tools }) {
-	// 	const frameIndex = toolbar.findIndex((item) => item.id === 'frame')
-	// 	if (frameIndex !== -1) toolbar.splice(frameIndex, 1)
-	// 	const highlighterIndex = toolbar.findIndex((item) => item.id === 'highlight')
-	// 	if (highlighterIndex !== -1) {
-	// 		const highlighterItem = toolbar[highlighterIndex]
-	// 		toolbar.splice(highlighterIndex, 1)
-	// 		toolbar.splice(3, 0, highlighterItem)
-	// 	}
-	// 	toolbar.splice(2, 0, toolbarItem(tools.liveImage))
-	// 	return toolbar
-	// },
-}
-
-const shapeUtils = [LiveImageShapeUtil]
-const tools = [LiveImageTool]
+initFalClient()
 
 export default function Home() {
-	const onEditorMount = (editor: Editor) => {
-		// We need the editor to think that the live image shape is a frame
-		// @ts-expect-error: patch
-		editor.isShapeOfType = function (arg, type) {
-			const shape = typeof arg === 'string' ? this.getShape(arg)! : arg
-			if (shape.type === 'live-image' && type === 'frame') {
-				return true
-			}
-			return shape.type === type
-		}
-
-		// If there isn't a live image shape, create one
-		if (!editor.getCurrentPageShapes().some((shape) => shape.type === 'live-image')) {
-			editor.createShape<LiveImageShape>({
-				type: 'live-image',
-				x: 120,
-				y: 180,
-				props: {
-					w: 512,
-					h: 512,
-					name: '',
-				},
-			})
-		}
-
-		editor.setStyleForNextShapes(DefaultSizeStyle, 'xl')
-	}
-
 	return (
-		<LiveImageProvider appId="110602490-lcm-sd15-i2i">
+		<LiveImageProvider appId={FAL_APP_ID}>
 			<main className="tldraw-wrapper">
 				<div className="tldraw-wrapper__inner">
 					<Tldraw

@@ -21,30 +21,15 @@ import {
 } from 'tldraw'
 
 import { useLiveImage } from '@/hooks/useLiveImage'
+import {
+	DEFAULT_H,
+	DEFAULT_PROMPT_SUFFIX,
+	DEFAULT_SEED,
+	DEFAULT_STRENGTH,
+	DEFAULT_W,
+} from '@/lib/constants'
 import { FrameHeading } from './FrameHeading'
-
-// See https://www.fal.ai/models/latent-consistency-sd
-
-type Input = {
-	prompt: string
-	image_url: string
-	sync_mode: boolean
-	seed: number
-	strength?: number
-	guidance_scale?: number
-	num_inference_steps?: number
-	enable_safety_checks?: boolean
-}
-
-type Output = {
-	images: Array<{
-		url: string
-		width: number
-		height: number
-	}>
-	seed: number
-	num_inference_steps: number
-}
+import { LiveImageSettings } from './LiveImageSettings'
 
 export type LiveImageShape = TLBaseShape<
 	'live-image',
@@ -53,6 +38,9 @@ export type LiveImageShape = TLBaseShape<
 		h: number
 		name: string
 		overlayResult?: boolean
+		strength?: number
+		seed?: number
+		promptSuffix?: string
 	}
 >
 
@@ -65,9 +53,12 @@ export class LiveImageShapeUtil extends ShapeUtil<LiveImageShape> {
 
 	getDefaultProps() {
 		return {
-			w: 512,
-			h: 512,
+			w: DEFAULT_W,
+			h: DEFAULT_H,
 			name: '',
+			strength: DEFAULT_STRENGTH,
+			seed: DEFAULT_SEED,
+			promptSuffix: DEFAULT_PROMPT_SUFFIX,
 		}
 	}
 
@@ -151,8 +142,9 @@ export class LiveImageShapeUtil extends ShapeUtil<LiveImageShape> {
 
 	override component(shape: LiveImageShape) {
 		const editor = useEditor()
+		const isSelected = editor.getSelectedShapeIds().includes(shape.id)
 
-		useLiveImage(shape.id)
+		const { isLoading, error } = useLiveImage(shape.id)
 
 		const bounds = this.editor.getShapeGeometry(shape).bounds
 		const assetId = AssetRecordType.createId(shape.id.split(':')[1])
@@ -191,6 +183,52 @@ export class LiveImageShapeUtil extends ShapeUtil<LiveImageShape> {
 						}}
 					/>
 				)}
+				{/* Loading Overlay */}
+				{isLoading && (
+					<div
+						style={{
+							position: 'absolute',
+							top: 0,
+							left: shape.props.overlayResult ? 0 : shape.props.w,
+							width: shape.props.w,
+							height: shape.props.h,
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							backgroundColor: 'rgba(0,0,0,0.2)',
+							pointerEvents: 'none',
+						}}
+					>
+						<div className="tl-loading-spinner" style={{ width: 24, height: 24, border: '2px solid white', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+						<style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+					</div>
+				)}
+				{/* Error Toast */}
+				{error && (
+					<div
+						style={{
+							position: 'absolute',
+							bottom: 8,
+							left: shape.props.overlayResult ? 0 : shape.props.w,
+							width: shape.props.w,
+							display: 'flex',
+							justifyContent: 'center',
+							pointerEvents: 'none',
+						}}
+					>
+						<div style={{
+							backgroundColor: 'var(--color-error)',
+							color: 'white',
+							padding: '4px 8px',
+							borderRadius: 4,
+							fontSize: 12,
+						}}>
+							{error.message}
+						</div>
+					</div>
+				)}
+
+				{/* Controls */}
 				<TldrawUiButton
 					type="icon"
 					style={{
@@ -214,6 +252,9 @@ export class LiveImageShapeUtil extends ShapeUtil<LiveImageShape> {
 				>
 					<TldrawUiButtonIcon icon={shape.props.overlayResult ? 'chevron-right' : 'chevron-left'} />
 				</TldrawUiButton>
+
+				{/* Settings Panel - Only show when selected */}
+				{isSelected && <LiveImageSettings shape={shape} />}
 			</>
 		)
 	}
